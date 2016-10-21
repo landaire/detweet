@@ -1,6 +1,6 @@
 # detweet
 
-Have some spam on your profile? Maybe an association with someone you want to get rid of? detweet allows you todelete tweets before or after a specific date that match a given regular expression.
+Have some spam on your profile? Maybe an association with someone you want to get rid of? detweet allows you to delete tweets before or after a specific date that match a given regular expression.
 
 ## Usage
 
@@ -49,6 +49,10 @@ In your terminal run:
 ```
 source credentials
 ```
+
+### Request your twitter archive
+
+Go to your profile settings on twitter.com and request your twitter archive. This will contain the `tweets.csv` file used by detweet.
 
 ### Example run
 
