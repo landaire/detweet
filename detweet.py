@@ -57,18 +57,19 @@ def main():
 
     api = tweepy.API(auth)
 
+    # Parse the before/after dates if they exist
     before_date = None
     after_date = None
-
     if args.before is not None:
         before_date = moment.date(args.before, DATE_FORMAT)
     if args.after is not None:
         after_date = moment.date(args.after, DATE_FORMAT)
 
+    # Read the CSV file
+    matching_tweets = []
     with open(args.csv) as csv_file:
         reader = csv.DictReader(csv_file)
 
-        matching_tweets = []
         for row in reader:
             # slice the date here so that we don't bother parsing the time
             tweet_date = moment.date(row['timestamp'][:len(TWEET_TIMESTAMP_FORMAT)], TWEET_TIMESTAMP_FORMAT)
@@ -82,24 +83,25 @@ def main():
             if tweet_matches_patterns(row['text'], args.pattern):
                 matching_tweets.append(row)
 
+    # Begin doing tweet deletion
+    if not args.dry:
+        print('Beginning to delete tweets:\n\n')
+
+    username = auth.get_username()
+    for tweet in matching_tweets:
+        print(tweet['timestamp'], 'https://twitter.com/{}/status/{}'.format(username, tweet['tweet_id']),
+              tweet['text'], '\n')
+
         if not args.dry:
-            print('Beginning to delete tweets:\n\n')
+            try:
+                api.destroy_status(int(tweet['tweet_id']))
+            except TweepError as e:
+                # Tweet with ID not found
+                if e.api_code != 144:
+                    raise e
 
-        username = auth.get_username()
-        for tweet in matching_tweets:
-            print(tweet['timestamp'], 'https://twitter.com/{}/status/{}'.format(username, tweet['tweet_id']),
-                  tweet['text'], '\n')
-
-            if not args.dry:
-                try:
-                    api.destroy_status(int(tweet['tweet_id']))
-                except TweepError as e:
-                    # Tweet with ID not found
-                    if e.api_code != 144:
-                        raise e
-
-                # Make 1 request every 10 seconds
-                time.sleep(10)
+            # Make 1 request every 10 seconds
+            time.sleep(10)
 
 
 def eprint(*args, **kwargs):
@@ -114,6 +116,7 @@ def tweet_matches_patterns(tweet, patterns):
     """
 
     for pattern in patterns:
+        # this could probably be optimized to use compiled patterns but that's not the bottleneck here
         if re.search(pattern, tweet, re.IGNORECASE) is not None:
             return True
 
