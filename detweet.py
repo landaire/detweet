@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from __future__ import print_function
+from tweepy.error import TweepError
 import argparse
 import tweepy
 import os
@@ -8,6 +9,7 @@ import sys
 import csv
 import re
 import moment
+import time
 
 ENVIRON_CONSUMER_KEY = 'CONSUMER_KEY'
 ENVIRON_CONSUMER_SECRET = 'CONSUMER_SECRET'
@@ -21,7 +23,7 @@ TWEET_TIMESTAMP_FORMAT = 'YYYY-MM-DD'
 def main():
     parser = argparse.ArgumentParser(description='Delete tweets en masse')
     parser.add_argument('--csv', help='the path to your tweets.csv file located in your twitter archive', required=True)
-    parser.add_argument('--dry', type=bool, default=False, help='do a dry run')
+    parser.add_argument('--dry', action='store_true', default=False, help='do a dry run')
     parser.add_argument('--before', help='match tweets before this date (YYYY-M-D)')
     parser.add_argument('--after', help='match tweets after this date (YYYY-M-D)')
     parser.add_argument('pattern', help='regular expressions to match', nargs='+')
@@ -48,6 +50,13 @@ def main():
 
         exit(1)
 
+    # Set up tweepy
+    auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
+    auth.secure = True
+    auth.set_access_token(access_token, access_token_secret)
+
+    api = tweepy.API(auth)
+
     before_date = None
     after_date = None
 
@@ -73,8 +82,24 @@ def main():
             if tweet_matches_patterns(row['text'], args.pattern):
                 matching_tweets.append(row)
 
+        if not args.dry:
+            print('Beginning to delete tweets:\n\n')
+
+        username = auth.get_username()
         for tweet in matching_tweets:
-            print(tweet['text'])
+            print(tweet['timestamp'], 'https://twitter.com/{}/status/{}'.format(username, tweet['tweet_id']),
+                  tweet['text'], '\n')
+
+            if not args.dry:
+                try:
+                    api.destroy_status(int(tweet['tweet_id']))
+                except TweepError as e:
+                    # Tweet with ID not found
+                    if e.api_code != 144:
+                        raise e
+
+                # Make 1 request every 10 seconds
+                time.sleep(10)
 
 
 def eprint(*args, **kwargs):
